@@ -1,4 +1,4 @@
 # although you may wish to install tensorflow by hand to get only what you need
 tensorflow
-git+http://github.com/PFCM/rnndatasets
+git+https://github.com/PFCM/datasets
 nose2
