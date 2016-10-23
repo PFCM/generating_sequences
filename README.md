@@ -1,3 +1,4 @@
+[![Stories in Ready](https://badge.waffle.io/PFCM/generating_sequences.png?label=ready&title=Ready)](https://waffle.io/PFCM/generating_sequences)
 # generating sequences
 
 Exploring some different ways of generating sequences with recurrent neural
