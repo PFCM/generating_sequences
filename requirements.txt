@@ -1,4 +1,4 @@
-# although you may wish to install tensorflow by hand to get only what you need
-tensorflow
+# this is motly for CI, it's unlikely to be the tensorflow you need
+https://storage.googleapis.com/tensorflow/linux/cpu/tensorflow-0.11.0rc1-cp35-cp35m-linux_x86_64.whl
 git+https://github.com/PFCM/datasets
 nose2
