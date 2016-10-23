@@ -1,0 +1,4 @@
+# although you may wish to install tensorflow by hand to get only what you need
+tensorflow
+git+https://github.com/PFCM/rnndatasets
+nose2
