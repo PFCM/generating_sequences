@@ -9,3 +9,7 @@ install:
   - pip install coveralls cov-core
 script: nose2 --with-coverage
 after_success: coveralls
+branches:
+  only:
+    - master
+    - develop
