@@ -26,17 +26,19 @@ def argmax_and_embed(embedding, output_list=None, output_projection=None):
     """
     def _argmax_embed(prev, i):
         var = _maybe_project(prev, output_projection)
-        next_ = tf.nn.embedding_lookup(embedding, tf.argmax(var, 1))
+        next_ = tf.argmax(var, 1)
 
         if output_list is not None:
             output_list.append(next_)
+
+        next_ = tf.nn.embedding_lookup(embedding, next_)
 
         return next_
 
     return _argmax_embed
 
 
-def sample_and_embed(embedding, temperature, output_list,
+def sample_and_embed(embedding, temperature, output_list=None,
                      output_projection=None):
     """Returns a callable (usable as a loop_fn for seq2seq) which takes a
     sample from a batch of outputs and embeds them. Optionally applies a
@@ -56,11 +58,16 @@ def sample_and_embed(embedding, temperature, output_list,
     def _sample_embed(prev, i):
         var = _maybe_project(prev, output_projection)
         var /= temperature
-        next_ = tf.nn.embedding_lookup(
-            embedding, tf.multinomial(var, 1))
 
+        next_ = tf.multinomial(var, 1)
+        # get rid of the num_samples dimension
+        next_ = tf.squeeze(next_)
+        # maybe store it
         if output_list is not None:
             output_list.append(next_)
+        # look up the embedding
+        next_ = tf.nn.embedding_lookup(
+            embedding, next_)
 
         return next_
 
