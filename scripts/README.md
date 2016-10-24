@@ -21,3 +21,6 @@ Of note:
         given the current sequence so far. To sample we start go one
         step at a time generating an output based on the outputs
         generated thus far.
+  - `width` (int) the number of hidden units per RNN cell.
+  - `layers` (int) the number of RNN cells stacked up.
+  - `keep_prob` (float) the amount of dropout applied to inputs.
