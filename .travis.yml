@@ -4,7 +4,7 @@ dist: trusty
 python:
   - "3.5"
 install:
-  - apt-get install libc6
+  - sudo apt-get install libc6
   - pip install -r requirements.txt
   - pip install coveralls cov-core
 script: nose2 --with-coverage
