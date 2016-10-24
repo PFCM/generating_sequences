@@ -1,5 +1,6 @@
 [![Stories in Ready](https://badge.waffle.io/PFCM/generating_sequences.png?label=ready&title=Ready)](https://waffle.io/PFCM/generating_sequences)
 [![Build Status](https://travis-ci.org/PFCM/generating_sequences.svg?branch=master)](https://travis-ci.org/PFCM/generating_sequences)
+[![Coverage Status](https://coveralls.io/repos/github/PFCM/generating_sequences/badge.svg?branch=master)](https://coveralls.io/github/PFCM/generating_sequences?branch=master)
 # generating sequences
 
 Exploring some different ways of generating sequences with recurrent neural
