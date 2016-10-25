@@ -25,13 +25,31 @@ tf.app.flags.DEFINE_integer('keep_prob', 1.0, 'dropout keep prob for inputs')
 FLAGS = tf.app.flags.FLAGS
 
 
-def get_forward():
+def get_forward(inputs, vocab_size):
     """Gets the forward parts of the model, based on the flags.
     Returns it all in a dict, to avoid passing around too much.
     """
     cell = util.get_cell(FLAGS.cell, FLAGS.width, FLAGS.layers,
                          FLAGS.keep_prob)
+    model = {}
+    with tf.variable_scope('rnn') as scope:
+        if 'nextstep' in FLAGS.model:
+            if 'standard' in FLAGS.model:
+                forward = rnn.standard_nextstep_inference(
+                    cell, inputs, vocab_size, scope=scope)
+                scope.reuse_variables()
+                sampling = rnn.standard_nextstep_inference(
+                    cell, inputs, vocab_size, scope=scope)
+        else:
+            raise ValueError('Unknown model: {}'.format(FLAGS.model))
 
+    model['inference'] = {'initial_state': forward[0],
+                          'logits': forward[1],
+                          'final_state': forward[2]}
+    model['sampling'] = {'initial_state': sampling[0],
+                         'sequence': sampling[1],
+                         'final_state': sampling[2]}
+    return model
 
 
 def main(_):
@@ -42,7 +60,7 @@ def main(_):
         - initialise or reload the variables.
         - train until it's time to go.
     """
-    rnn_model = get_forward()
+    rnn_model = get_forward(inputs, len(vocab))
 
 
 if __name__ == '__main__':
