@@ -2,6 +2,43 @@
 import tensorflow as tf
 
 
+def get_data(batch_size, sequence_length, dataset):
+    """Gets a dict with the things needed for the data, including placeholders
+
+    Args:
+        batch_size (int): sequences per batch.
+        sequence_length (int): length of sequences concerned (for data where it
+            matters).
+        dataset (str): the dataset. Options at this stage are:
+            - _warandpeace_: character-level war and peace.
+            - _ptb/char_: character level penn treebank
+            - _ptb/word_: word level penn treeback
+            - _mnist_: sequential mnist (not sigmoid)
+            - _jsb_: JSB chorales
+
+    Returns:
+        dict: fields:
+            - `placeholders`: dict with placeholder variables:
+                - `input`: for the inputs
+                - `targets`: for targets, probably the inputs shifted across.
+            - `train`: training data
+            - `valid`: validation data
+            - `test`: testing data
+    """
+    if dataset == 'warandpeace':
+        raise NotImplementedError('nope')
+    elif dataset == 'ptb/char':
+        raise NotImplementedError('not yet')
+    elif dataset == 'ptb/word':
+        raise NotImplementedError('hold your horses')
+    elif dataset == 'mnist':
+        raise NotImplementedError('...')
+    elif dataset == 'jsb':
+        raise NotImplementedError('nerp')
+    else:
+        raise ValueError('Unknown dataset: {}'.format(dataset))
+
+
 def get_cell(name, width, layers=1, keep_prob=1.0):
     """Gets a tf.nn.rnn_cell.RNNCell to make models. Note that we always let
     the state be a tuple, so you have to be a little bit careful.
