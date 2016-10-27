@@ -2,7 +2,45 @@
 import tensorflow as tf
 
 
-def get_data(batch_size, sequence_length, dataset):
+def _integer_placeholders(batch_size, sequence_length):
+    """Get placeholders for when input/target are integers"""
+    inps = tf.placeholder(tf.int32, shape=[sequence_length, batch_size],
+                          name='inputs')
+    targ = tf.placeholder(tf.int32, shape=[sequence_length, batch_size],
+                          name='targets')
+
+    return inps, targ
+
+
+def _get_result(num, func, *args):
+    """Returns a function which calls another function and returns a particular
+    element of its results."""
+    def _get():
+        return func(args)[num]
+
+    return _get
+
+
+def embed(int_inputs, embedding_size, num_inputs, scope=None):
+    """Embeds an integer tensor.
+
+    Args:
+        int_inputs: the tensor of indices.
+        embedding_size (int): the size of the embeddings required.
+        num_inputs (int): the maximal number of input ids.
+        scope (Optional): a scope under which to add the ops/get the embedding
+            matrix.
+
+    Returns:
+        embedded tensor
+    """
+    with tf.variable_scope(scope or 'embedding'):
+        embeddings = tf.get_variable('embeddings',
+                                     shape=[num_inputs, embedding_size])
+        return tf.nn.embedding_lookup(embeddings, int_inputs)
+
+
+def get_data(batch_size, sequence_length, dataset, embedding_size):
     """Gets a dict with the things needed for the data, including placeholders
 
     Args:
@@ -15,29 +53,60 @@ def get_data(batch_size, sequence_length, dataset):
             - _ptb/word_: word level penn treeback
             - _mnist_: sequential mnist (not sigmoid)
             - _jsb_: JSB chorales
+        embedding_size: if the data needs embedding, how big should they be?
 
     Returns:
         dict: fields:
             - `placeholders`: dict with placeholder variables:
-                - `input`: for the inputs
+                - `inputs`: for the inputs
                 - `targets`: for targets, probably the inputs shifted across.
-            - `train`: training data
-            - `valid`: validation data
-            - `test`: testing data
+            - `rnn_inputs`: the tensor to use as inputs for the RNN, probably
+                placeholder/inputs through an embedding lookup.
+            - `train_iter`: callable that returns an iterator over training
+                data
+            - `valid_iter`: callable that returns an iterator over valid data
+            - `test_iter`: callable that returns an iterator over test data.
+            - `vocab`: iff the data is discrete symbols, a dict mapping ids to
+                some more sensible representation.
+            - `target_size`: probably len(vocab), but maybe not.
     """
-    data = {}
+    data_dict = {}
     if dataset == 'warandpeace':
-        raise NotImplementedError('nope')
+        import rnndatasets.warandpeace as data
+        vocab = data.get_vocab('char')
+        inputs, targets = _integer_placeholders(batch_size, sequence_length)
+        rnn_inputs = embed(inputs, embedding_size, len(vocab), scope='input')
+
+        train_fetcher = _get_result(0, data.get_split_iters, sequence_length,
+                                    batch_size)
+        valid_fetcher = _get_result(1, data.get_split_iters, sequence_length,
+                                    batch_size)
+        test_fetcher = _get_result(2, data.get_split_iters, sequence_length,
+                                   batch_size)
+        data_dict['target_size'] = len(vocab)
     elif dataset == 'ptb/char':
         raise NotImplementedError('not yet')
     elif dataset == 'ptb/word':
         raise NotImplementedError('hold your horses')
     elif dataset == 'mnist':
-        raise NotImplementedError('not even sure this one is a good idea)
+        raise NotImplementedError('not even sure this one is a good idea')
     elif dataset == 'jsb':
         raise NotImplementedError('nerp')
     else:
         raise ValueError('Unknown dataset: {}'.format(dataset))
+
+    data_dict.update({
+        'placeholders': {
+            'inputs': inputs,
+            'targets': targets},
+        'rnn_inputs': rnn_inputs,
+        'train_iter': train_fetcher,
+        'valid_iter': valid_fetcher,
+        'test_fetcher': test_fetcher})
+    if vocab:
+        data_dict['vocab'] = vocab
+
+    return data_dict
 
 
 def get_cell(name, width, layers=1, keep_prob=1.0):
