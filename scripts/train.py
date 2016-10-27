@@ -5,6 +5,7 @@ checkpoints as well as firing off the training loop. The training loop
 itself might have to be somewhere else as some models might need a couple
 of phases.
 """
+import random
 
 import tensorflow as tf
 
@@ -27,6 +28,10 @@ tf.app.flags.DEFINE_integer('sequence_length', 100, 'max length of bptt')
 tf.app.flags.DEFINE_string('dataset', 'warandpeace', 'what data?')
 tf.app.flags.DEFINE_integer('embedding_size', 32, 'size of symbol embeddings')
 tf.app.flags.DEFINE_float('learning_rate', 0.0001, 'step size')
+tf.app.flags.DEFINE_integer('num_epochs', 100, 'how many times through')
+
+tf.app.flags.DEFINE_integer('sample_length', 500,
+                            'size of samples to periodically print')
 
 FLAGS = tf.app.flags.FLAGS
 
@@ -85,7 +90,6 @@ def minimise_xent(rnn_output, targets, global_step=None, var_list=None):
     """
     # we aren't going to do anything fancy here like use weights (yet) so
     # we may as well just stick them all together into one large batch.
-    num_classes = rnn_output[0].get_shape()[1].value
     logits = tf.concat(0, rnn_output)
 
     loss_op = tf.nn.sparse_softmax_cross_entropy_with_logits(
@@ -110,6 +114,57 @@ def _start_msg(msg, width=50):
 
 def _end_msg(msg, width=50):
     print('\r{:~^{}}'.format(msg, width))
+
+
+def _fill_feed(data_dict, in_batch, target_batch, state_var=None,
+               state_val=None):
+    """fills a feed dict"""
+    feed = {data_dict['placeholders']['inputs']: in_batch,
+            data_dict['placeholders']['targets']: target_batch}
+    if state_var is not None:
+        feed[state_var] = state_val
+    return feed
+
+
+def sample(model, data, sess):
+    """Draws a sample from the model"""
+    if 'inverse_vocab' not in data:
+        data['inverse_vocab'] = {b: a for a, b in data['vocab'].items()}
+
+    seq = []
+    # TODO(pfcm): feed a value for input and carry the state over.
+    while len(seq) < FLAGS.sample_length:
+        seq.extend(sess.run(model['sampling']['sequence']))
+
+    batch_index = random.randint(0, FLAGS.batch_size)
+    samp = ''.join([str(data['inverse_vocab'][symbol[batch_index]])
+                    for symbol in seq])
+
+    return samp
+
+
+def do_training(data, model, loss_op, train_op):
+    """Trains for a while."""
+    _start_msg('getting session, possibly restoring')
+    sv = tf.train.Supervisor(logdir=FLAGS.logdir)
+
+    with sv.managed_session() as sess:
+        _end_msg('ready')
+
+        for epoch in range(FLAGS.num_epochs):
+            print('~~Epoch {}:'.format(epoch+1))
+            epoch_loss, epoch_steps = 0, 0
+            for in_batch, data_batch in data['train_iter']():
+                feed_dict = _fill_feed(data, in_batch, data_batch)
+                batch_loss, _ = sess.run(
+                    [loss_op, train_op], feed_dict)
+                epoch_loss += batch_loss
+                epoch_steps += 1
+                print('\r~~~~({}): {}'.format(epoch_steps, batch_loss), end='',
+                      flush=True)
+            print('\r~~~Training loss: {}'.format(epoch_loss/epoch_steps))
+
+            print(sample(model, data, sess))
 
 
 def main(_):
@@ -137,6 +192,7 @@ def main(_):
                                       data['placeholders']['targets'],
                                       global_step=global_step)
     _end_msg('got train ops')
+    do_training(data, rnn_model, loss_op, train_op)
 
 
 

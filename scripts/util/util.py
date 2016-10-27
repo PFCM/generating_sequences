@@ -1,4 +1,6 @@
 """Utilities that make life easier."""
+from functools import partial
+
 import tensorflow as tf
 
 
@@ -12,13 +14,24 @@ def _integer_placeholders(batch_size, sequence_length):
     return inps, targ
 
 
+def _make_targets(data):
+    """for the datasets which just return a single item"""
+    return data[:-1], data[1:]
+
+
 def _get_result(num, func, *args):
     """Returns a function which calls another function and returns a particular
     element of its results."""
     def _get():
-        return func(args)[num]
+        return func(*args)[num]
 
     return _get
+
+
+def _get_result_make_targets_and_yield(num, func, *args):
+    """Gets an appropriate iterator"""
+    for batch in func(*args)[num]:
+        yield _make_targets(batch)
 
 
 def embed(int_inputs, embedding_size, num_inputs, scope=None):
@@ -77,12 +90,15 @@ def get_data(batch_size, sequence_length, dataset, embedding_size):
         inputs, targets = _integer_placeholders(batch_size, sequence_length)
         rnn_inputs = embed(inputs, embedding_size, len(vocab), scope='input')
 
-        train_fetcher = _get_result(0, data.get_split_iters, sequence_length,
-                                    batch_size)
-        valid_fetcher = _get_result(1, data.get_split_iters, sequence_length,
-                                    batch_size)
-        test_fetcher = _get_result(2, data.get_split_iters, sequence_length,
-                                   batch_size)
+        train_fetcher = partial(_get_result_make_targets_and_yield, 0,
+                                data.get_split_iters, sequence_length+1,
+                                batch_size)
+        valid_fetcher = partial(_get_result_make_targets_and_yield, 1,
+                                data.get_split_iters, sequence_length+1,
+                                batch_size)
+        test_fetcher = partial(_get_result_make_targets_and_yield, 2,
+                               data.get_split_iters, sequence_length+1,
+                               batch_size)
         data_dict['target_size'] = len(vocab)
     elif dataset == 'ptb/char':
         raise NotImplementedError('not yet')
