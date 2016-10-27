@@ -25,6 +25,7 @@ def get_data(batch_size, sequence_length, dataset):
             - `valid`: validation data
             - `test`: testing data
     """
+    data = {}
     if dataset == 'warandpeace':
         raise NotImplementedError('nope')
     elif dataset == 'ptb/char':
