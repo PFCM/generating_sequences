@@ -32,7 +32,7 @@ def get_data(batch_size, sequence_length, dataset):
     elif dataset == 'ptb/word':
         raise NotImplementedError('hold your horses')
     elif dataset == 'mnist':
-        raise NotImplementedError('...')
+        raise NotImplementedError('not even sure this one is a good idea)
     elif dataset == 'jsb':
         raise NotImplementedError('nerp')
     else:
