@@ -26,8 +26,8 @@ class TestStandardNextStep(unittest.TestCase):
             self.assertEqual(len(logits), 50)
             self.assertEqual(logits[0].get_shape().as_list(),
                              [30, 5])
-            self.assertEqual(istate.get_shape().as_list(),
-                             fstate.get_shape().as_list())
+            self.assertEqual(istate[0].get_shape().as_list(),
+                             fstate[0].get_shape().as_list())
 
     def test_return_states(self):
         """Make sure the return_states flag works (in terms of shape)"""
