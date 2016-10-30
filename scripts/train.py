@@ -7,6 +7,7 @@ of phases.
 """
 import random
 
+import numpy as np
 import tensorflow as tf
 
 import util
@@ -32,16 +33,20 @@ tf.app.flags.DEFINE_integer('num_epochs', 100, 'how many times through')
 
 tf.app.flags.DEFINE_integer('sample_length', 500,
                             'size of samples to periodically print')
+tf.app.flags.DEFINE_integer('save_every', 300, 'how often to save checkpoints')
 
 FLAGS = tf.app.flags.FLAGS
 
 
-def get_forward(inputs, vocab_size):
+def get_forward(data_dict):
     """Gets the forward parts of the model, based on the flags.
     Returns it all in a dict, to avoid passing around too much.
     """
     cell = util.get_cell(FLAGS.cell, FLAGS.width, FLAGS.layers,
                          FLAGS.keep_prob)
+    inputs = data_dict['rnn_inputs']
+    embedding = data_dict['embedding_matrix']
+    vocab_size = data_dict['target_size']
     model = {}
     with tf.variable_scope('rnn') as scope:
         if 'nextstep' in FLAGS.model:
@@ -49,8 +54,8 @@ def get_forward(inputs, vocab_size):
                 forward = rnn.standard_nextstep_inference(
                     cell, inputs, vocab_size, scope=scope)
                 scope.reuse_variables()
-                sampling = rnn.standard_nextstep_inference(
-                    cell, inputs, vocab_size, scope=scope)
+                sampling = rnn.standard_nextstep_sample(
+                    cell, inputs, vocab_size, embedding, scope=scope)
         else:
             raise ValueError('Unknown model: {}'.format(FLAGS.model))
 
@@ -65,7 +70,8 @@ def get_forward(inputs, vocab_size):
 
 def get_optimiser():
     """Gets an appropriate optimiser according to FLAGS"""
-    return tf.train.AdamOptimizer(FLAGS.learning_rate)
+    # return tf.train.AdamOptimizer(FLAGS.learning_rate)
+    return tf.train.RMSPropOptimizer(FLAGS.learning_rate)
 
 
 def minimise_xent(rnn_output, targets, global_step=None, var_list=None):
@@ -99,9 +105,9 @@ def minimise_xent(rnn_output, targets, global_step=None, var_list=None):
     tf.scalar_summary('xent', loss_op)
 
     # now get some stuff to actually train
-    optimiser = get_optimiser()
+    opt = get_optimiser()
 
-    train_op = optimiser.minimize(
+    train_op = opt.minimize(
         loss_op, global_step=global_step,
         var_list=var_list or tf.trainable_variables())
 
@@ -116,25 +122,70 @@ def _end_msg(msg, width=50):
     print('\r{:~^{}}'.format(msg, width))
 
 
-def _fill_feed(data_dict, in_batch, target_batch, state_var=None,
+def _fill_feed(data_dict, in_batch, target_batch=None, state_var=None,
                state_val=None):
     """fills a feed dict"""
-    feed = {data_dict['placeholders']['inputs']: in_batch,
-            data_dict['placeholders']['targets']: target_batch}
+    feed = {data_dict['placeholders']['inputs']: in_batch}
+    if target_batch is not None:
+        feed[data_dict['placeholders']['targets']] = target_batch
     if state_var is not None:
-        feed[state_var] = state_val
+        for var, val in zip(state_var, state_val):
+            feed[var] = val
     return feed
 
 
-def sample(model, data, sess):
-    """Draws a sample from the model"""
+def _init_nextstep_state(model, data, seed, sess):
+    """Gets a state for the RNN having been run on `seed` inputs"""
+    # if seed isn't a multiple of sequence_length, it will be an issue
+    state_var = model['sampling']['initial_state']
+    state = sess.run(state_var)
+    for seq_batch in util.iter_chunks(seed, FLAGS.sequence_length):
+        results = sess.run(
+            model['sampling']['sequence'] + model['sampling']['final_state'],
+            _fill_feed(data, seq_batch, state_var=state_var, state_val=state))
+        sequence = results[:FLAGS.sequence_length]
+        state = results[FLAGS.sequence_length:]
+    return state, [sequence[-1]] * FLAGS.sequence_length
+
+
+def sample(model, data, sess, seed=None):
+    """Draws a sample from the model
+
+    Args:
+        model (dict): return value of one of the get_model functions.
+        data (dict): return from the get_data function.
+        sess (tf.Session): a session in which to run the sampling ops.
+        seed (Optional): either a sequence to feed into the first few batches
+            or None, in which case just the GO symbol is fed in.
+
+    Returns:
+        str: the sample.
+    """
     if 'inverse_vocab' not in data:
         data['inverse_vocab'] = {b: a for a, b in data['vocab'].items()}
 
+    if seed is not None:
+        # run it a bit to get a starting state
+        state, inputs = _init_nextstep_state(model, data, seed, sess)
+    else:
+        # otherwise start from zero
+        state = sess.run(model['sampling']['initial_state'])
+        inputs = np.array(
+            [[data['go_symbol']] * FLAGS.batch_size] * FLAGS.sequence_length)
+
     seq = []
-    # TODO(pfcm): feed a value for input and carry the state over.
+
+    # now just roll through
     while len(seq) < FLAGS.sample_length:
-        seq.extend(sess.run(model['sampling']['sequence']))
+        results = sess.run(
+            model['sampling']['sequence'] + model['sampling']['final_state'],
+            _fill_feed(data, inputs,
+                       state_var=model['sampling']['initial_state'],
+                       state_val=state))
+        seq.extend(results[:FLAGS.sequence_length-2])
+        state = results[FLAGS.sequence_length-1:]
+        inputs = np.array(
+            [seq[-1]] * FLAGS.sequence_length)
 
     batch_index = random.randint(0, FLAGS.batch_size)
     samp = ''.join([str(data['inverse_vocab'][symbol[batch_index]])
@@ -143,21 +194,30 @@ def sample(model, data, sess):
     return samp
 
 
-def do_training(data, model, loss_op, train_op):
+def do_training(data, model, loss_op, train_op, saver=None):
     """Trains for a while."""
     _start_msg('getting session, possibly restoring')
-    sv = tf.train.Supervisor(logdir=FLAGS.logdir)
+    sv = tf.train.Supervisor(logdir=FLAGS.logdir, saver=saver,
+                             save_model_secs=FLAGS.save_every)
 
     with sv.managed_session() as sess:
         _end_msg('ready')
 
         for epoch in range(FLAGS.num_epochs):
+            # get the initial state
+            state = sess.run(model['inference']['initial_state'])
             print('~~Epoch {}:'.format(epoch+1))
             epoch_loss, epoch_steps = 0, 0
-            for in_batch, data_batch in data['train_iter']():
-                feed_dict = _fill_feed(data, in_batch, data_batch)
-                batch_loss, _ = sess.run(
-                    [loss_op, train_op], feed_dict)
+            for in_batch, targ_batch in data['train_iter']():
+                feed_dict = _fill_feed(
+                    data, in_batch, targ_batch,
+                    state_var=model['inference']['initial_state'],
+                    state_val=state)
+                results = sess.run(
+                    [loss_op, train_op] + model['inference']['final_state'],
+                    feed_dict)
+                batch_loss = results[0]
+                state = results[2:]
                 epoch_loss += batch_loss
                 epoch_steps += 1
                 print('\r~~~~({}): {}'.format(epoch_steps, batch_loss), end='',
@@ -181,19 +241,19 @@ def main(_):
     _end_msg('got data')
 
     _start_msg('getting forward model')
-    rnn_model = get_forward(data['rnn_inputs'],
-                            data['target_size'])
+    rnn_model = get_forward(data)
     _end_msg('got forward model')
 
     _start_msg('getting train ops')
     # TODO(pfcm): be more flexible with this
-    global_step = tf.Variable(0, name='global_step')
-    loss_op, train_op = minimise_xent(rnn_model['inference']['logits'],
-                                      data['placeholders']['targets'],
-                                      global_step=global_step)
+    global_step = tf.Variable(0, name='global_step', trainable=False)
+    saver = tf.train.Saver(tf.all_variables(),
+                           max_to_keep=1)
+    loss_op, train_op = minimise_xent(
+        rnn_model['inference']['logits'], data['placeholders']['targets'],
+        global_step=global_step)
     _end_msg('got train ops')
-    do_training(data, rnn_model, loss_op, train_op)
-
+    do_training(data, rnn_model, loss_op, train_op, saver=saver)
 
 
 if __name__ == '__main__':

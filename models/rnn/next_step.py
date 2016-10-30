@@ -68,7 +68,7 @@ def standard_nextstep_inference(cell, inputs, output_size, scope=None,
         if return_states:
             logits = (states, logits)
 
-    return initial_state, logits, final_state
+    return [initial_state], logits, [final_state]
 
 
 def standard_nextstep_sample(cell, inputs, output_size, embedding, scope=None,
@@ -123,4 +123,4 @@ def standard_nextstep_sample(cell, inputs, output_size, embedding, scope=None,
         all_states, fstate = tf.nn.seq2seq.rnn_decoder(
             inputs, initial_state, cell, loop_function=loop_fn, scope=scope)
 
-    return initial_state, sequence, fstate
+    return [initial_state], sequence, [fstate]

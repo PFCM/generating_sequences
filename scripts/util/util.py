@@ -4,6 +4,21 @@ from functools import partial
 import tensorflow as tf
 
 
+def iter_chunks(seq, size):
+    """Yields chunks of a sequence we can slice up. Will ignore anything after
+    the last full chunk.
+
+    Args:
+        seq: sequence to chunk up.
+        size: the size of the chunks.
+
+    Yields:
+        chunks of size `size`.
+    """
+    for i in range(0, len(seq), size):
+        yield seq[i:i+size]
+
+
 def _integer_placeholders(batch_size, sequence_length):
     """Get placeholders for when input/target are integers"""
     inps = tf.placeholder(tf.int32, shape=[sequence_length, batch_size],
@@ -50,7 +65,7 @@ def embed(int_inputs, embedding_size, num_inputs, scope=None):
     with tf.variable_scope(scope or 'embedding'):
         embeddings = tf.get_variable('embeddings',
                                      shape=[num_inputs, embedding_size])
-        return tf.nn.embedding_lookup(embeddings, int_inputs)
+        return tf.nn.embedding_lookup(embeddings, int_inputs), embeddings
 
 
 def get_data(batch_size, sequence_length, dataset, embedding_size):
@@ -88,7 +103,8 @@ def get_data(batch_size, sequence_length, dataset, embedding_size):
         import rnndatasets.warandpeace as data
         vocab = data.get_vocab('char')
         inputs, targets = _integer_placeholders(batch_size, sequence_length)
-        rnn_inputs = embed(inputs, embedding_size, len(vocab), scope='input')
+        rnn_inputs, embedding = embed(
+            inputs, embedding_size, len(vocab), scope='input')
 
         train_fetcher = partial(_get_result_make_targets_and_yield, 0,
                                 data.get_split_iters, sequence_length+1,
@@ -100,6 +116,8 @@ def get_data(batch_size, sequence_length, dataset, embedding_size):
                                data.get_split_iters, sequence_length+1,
                                batch_size)
         data_dict['target_size'] = len(vocab)
+        data_dict['embedding_matrix'] = embedding
+        go_symbol = vocab['<GO>']
     elif dataset == 'ptb/char':
         raise NotImplementedError('not yet')
     elif dataset == 'ptb/word':
@@ -118,7 +136,8 @@ def get_data(batch_size, sequence_length, dataset, embedding_size):
         'rnn_inputs': rnn_inputs,
         'train_iter': train_fetcher,
         'valid_iter': valid_fetcher,
-        'test_fetcher': test_fetcher})
+        'test_fetcher': test_fetcher,
+        'go_symbol': go_symbol})
     if vocab:
         data_dict['vocab'] = vocab
 
