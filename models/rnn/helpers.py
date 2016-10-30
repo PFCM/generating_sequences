@@ -24,7 +24,7 @@ def argmax_and_embed(embedding, output_list=None, output_projection=None):
     Returns:
         embedding from embedding.
     """
-    def _argmax_embed(prev, i):
+    def _argmax_embed(prev, _):
         var = _maybe_project(prev, output_projection)
         next_ = tf.argmax(var, 1)
 
@@ -55,7 +55,7 @@ def sample_and_embed(embedding, temperature, output_list=None,
     Returns:
         embedding from embedding.
     """
-    def _sample_embed(prev, i):
+    def _sample_embed(prev, _):
         var = _maybe_project(prev, output_projection)
         var /= temperature
 
