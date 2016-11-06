@@ -77,7 +77,10 @@ def get_data(batch_size, sequence_length, dataset, embedding_size):
             matters).
         dataset (str): the dataset. Options at this stage are:
             - _warandpeace_: character-level war and peace.
+<<<<<<< HEAD
             - _occult_: a set of occult texts.
+=======
+>>>>>>> 272fb78fa85aadeea702e78b7e5f090d782a4dd6
             - _ptb/char_: character level penn treebank
             - _ptb/word_: word level penn treeback
             - _mnist_: sequential mnist (not sigmoid)
