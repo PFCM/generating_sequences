@@ -120,7 +120,7 @@ def standard_nextstep_sample(cell, inputs, output_size, embedding, scope=None,
                                        output_list=sequence,
                                        output_projection=(weights, biases))
 
-        all_states, fstate = tf.nn.seq2seq.rnn_decoder(
+        _all_states, fstate = tf.nn.seq2seq.rnn_decoder(
             inputs, initial_state, cell, loop_function=loop_fn, scope=scope)
 
     return [initial_state], sequence, [fstate]

@@ -9,6 +9,7 @@ import models.rnn.next_step as ns
 
 
 class TestStandardNextStep(unittest.TestCase):
+    """some basic tests"""
 
     def test_get_model(self):
         """Just make sure we can get a model without errors"""
@@ -35,7 +36,7 @@ class TestStandardNextStep(unittest.TestCase):
             inputs = tf.placeholder(tf.float32, [50, 30, 10])
             cell = tf.nn.rnn_cell.BasicRNNCell(32)
 
-            istate, logits, fstate = ns.standard_nextstep_inference(
+            _istate, logits, _fstate = ns.standard_nextstep_inference(
                 cell, inputs, 5, return_states=True)
 
             # check shapes are as expected
@@ -49,7 +50,7 @@ class TestStandardNextStep(unittest.TestCase):
             cell = tf.nn.rnn_cell.BasicRNNCell(32)
             embedding = tf.get_variable('embedding', [12, 10])
 
-            istate, seq, fstate = ns.standard_nextstep_sample(
+            _istate, seq, _fstate = ns.standard_nextstep_sample(
                 cell, inputs, 5, embedding, argmax=True)
 
             # check shapes are as expected
@@ -63,7 +64,7 @@ class TestStandardNextStep(unittest.TestCase):
             cell = tf.nn.rnn_cell.BasicRNNCell(32)
             embedding = tf.get_variable('embedding', [12, 10])
 
-            istate, seq, fstate = ns.standard_nextstep_sample(
+            _istate, seq, _fstate = ns.standard_nextstep_sample(
                 cell, inputs, 5, embedding, argmax=False)
 
             # check shapes are as expected

@@ -182,8 +182,8 @@ def sample(model, data, sess, seed=None):
             _fill_feed(data, inputs,
                        state_var=model['sampling']['initial_state'],
                        state_val=state))
-        seq.extend(results[:FLAGS.sequence_length-2])
-        state = results[FLAGS.sequence_length-1:]
+        seq.extend(results[:FLAGS.sequence_length - 2])
+        state = results[FLAGS.sequence_length - 1:]
         inputs = np.array(
             [seq[-1]] * FLAGS.sequence_length)
 
@@ -206,7 +206,7 @@ def do_training(data, model, loss_op, train_op, saver=None):
         for epoch in range(FLAGS.num_epochs):
             # get the initial state
             state = sess.run(model['inference']['initial_state'])
-            print('~~Epoch {}:'.format(epoch+1))
+            print('~~Epoch {}:'.format(epoch + 1))
             epoch_loss, epoch_steps = 0, 0
             for in_batch, targ_batch in data['train_iter']():
                 feed_dict = _fill_feed(
@@ -222,7 +222,7 @@ def do_training(data, model, loss_op, train_op, saver=None):
                 epoch_steps += 1
                 print('\r~~~~({}): {}'.format(epoch_steps, batch_loss), end='',
                       flush=True)
-            print('\r~~~Training loss: {}'.format(epoch_loss/epoch_steps))
+            print('\r~~~Training loss: {}'.format(epoch_loss / epoch_steps))
 
             print(sample(model, data, sess))
 

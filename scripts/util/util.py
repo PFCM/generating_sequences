@@ -16,7 +16,7 @@ def iter_chunks(seq, size):
         chunks of size `size`.
     """
     for i in range(0, len(seq), size):
-        yield seq[i:i+size]
+        yield seq[i:i + size]
 
 
 def _integer_placeholders(batch_size, sequence_length):
@@ -111,13 +111,13 @@ def get_data(batch_size, sequence_length, dataset, embedding_size):
             inputs, embedding_size, len(vocab), scope='input')
 
         train_fetcher = partial(_get_result_make_targets_and_yield, 0,
-                                data.get_split_iters, sequence_length+1,
+                                data.get_split_iters, sequence_length + 1,
                                 batch_size)
         valid_fetcher = partial(_get_result_make_targets_and_yield, 1,
-                                data.get_split_iters, sequence_length+1,
+                                data.get_split_iters, sequence_length + 1,
                                 batch_size)
         test_fetcher = partial(_get_result_make_targets_and_yield, 2,
-                               data.get_split_iters, sequence_length+1,
+                               data.get_split_iters, sequence_length + 1,
                                batch_size)
         data_dict['target_size'] = len(vocab)
         data_dict['embedding_matrix'] = embedding
