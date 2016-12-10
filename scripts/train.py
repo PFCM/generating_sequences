@@ -247,7 +247,7 @@ def main(_):
     _start_msg('getting train ops')
     # TODO(pfcm): be more flexible with this
     global_step = tf.Variable(0, name='global_step', trainable=False)
-    saver = tf.train.Saver(tf.all_variables(),
+    saver = tf.train.Saver(tf.global_variables(),
                            max_to_keep=1)
     loss_op, train_op = minimise_xent(
         rnn_model['inference']['logits'], data['placeholders']['targets'],

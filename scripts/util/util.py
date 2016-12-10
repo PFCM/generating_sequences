@@ -139,12 +139,12 @@ def get_data(batch_size, sequence_length, dataset, embedding_size):
         data_dict['target_size'] = len(vocab)
         data_dict['embedding_matrix'] = embedding
         go_symbol = vocab['<GO>']
-    elif dataset == 'ptb/char':
+    elif dataset == 'ptb/word':
         import rnndatasets.ptb as data
         train, valid, test, vocab = data.get_ptb_data()
         inputs, targets = _integer_placeholders(batch_size, sequence_length)
         rnn_inputs, embedding = embed(
-            ipnuts, embedding_size, len(vocab), scope='input')
+            inputs, embedding_size, len(vocab), scope='input')
         # "partial" even though we're providing all the args
         train_fetcher = partial(data.batch_iterator, train, batch_size,
                                 sequence_length, time_major=True)
@@ -155,8 +155,6 @@ def get_data(batch_size, sequence_length, dataset, embedding_size):
         data_dict['target_size'] = len(vocab)
         data_dict['embedding_matrix'] = embedding
         go_symbol = vocab['<GO>']
-    elif dataset == 'ptb/word':
-        raise NotImplementedError('hold your horses')
     elif dataset == 'mnist':
         raise NotImplementedError('not even sure this one is a good idea')
     elif dataset == 'jsb':
