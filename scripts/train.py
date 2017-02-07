@@ -31,7 +31,7 @@ tf.app.flags.DEFINE_integer('embedding_size', 32, 'size of symbol embeddings')
 tf.app.flags.DEFINE_float('learning_rate', 0.0001, 'step size')
 tf.app.flags.DEFINE_integer('num_epochs', 100, 'how many times through')
 
-tf.app.flags.DEFINE_integer('sample_length', 500,
+tf.app.flags.DEFINE_integer('sample_length', 150,
                             'size of samples to periodically print')
 tf.app.flags.DEFINE_integer('save_every', 300, 'how often to save checkpoints')
 

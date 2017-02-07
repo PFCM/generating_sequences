@@ -4,6 +4,22 @@ from functools import partial
 import tensorflow as tf
 
 
+def read_and_fold(filename, max_size):
+    """Reads a file, separates it by newlines and folds each line to be at most
+    max_size. Does not necessarily keep in order"""
+    with open(filename) as fp:
+        data = fp.read().split('\n')
+        new_data = []
+        for line in data:
+            if len(line) > max_size:
+                line = [line[0+i:max_size+i]
+                        for i in range(0, len(line), max_size)]
+            else:
+                line = [line]
+            new_data.extend(line)
+    return new_data
+
+
 def iter_chunks(seq, size):
     """Yields chunks of a sequence we can slice up. Will ignore anything after
     the last full chunk.
@@ -159,6 +175,9 @@ def get_data(batch_size, sequence_length, dataset, embedding_size):
         raise NotImplementedError('not even sure this one is a good idea')
     elif dataset == 'jsb':
         raise NotImplementedError('nerp')
+    elif dataset == 'txt':
+        # arbitrary line separated text file
+
     else:
         raise ValueError('Unknown dataset: {}'.format(dataset))
 
