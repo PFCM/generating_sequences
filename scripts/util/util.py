@@ -1,38 +1,31 @@
 """Utilities that make life easier."""
 from functools import partial
 
+import numpy as np
 import tensorflow as tf
 
-
-def read_and_fold(filename, max_size):
-    """Reads a file, separates it by newlines and folds each line to be at most
-    max_size. Does not necessarily keep in order"""
-    with open(filename) as fp:
-        data = fp.read().split('\n')
-        new_data = []
-        for line in data:
-            if len(line) > max_size:
-                line = [line[0+i:max_size+i]
-                        for i in range(0, len(line), max_size)]
-            else:
-                line = [line]
-            new_data.extend(line)
-    return new_data
+import util.text_file as text_file
 
 
-def iter_chunks(seq, size):
-    """Yields chunks of a sequence we can slice up. Will ignore anything after
-    the last full chunk.
+def _batch_iterator(data_items, batch_size, shuffle=True, transpose=True):
+    """iterates data along its first dimension"""
+    num_items = data_items[0].shape[0]
+    for item in data_items[1:]:
+        if item.shape[0] != num_items:
+            raise ValueError(
+                'all data needs to be the same shape in the first dimension')
+    num_batches = num_items // batch_size
+    indices = np.arange(num_items)
+    if shuffle:
+        np.random.shuffle(indices)
 
-    Args:
-        seq: sequence to chunk up.
-        size: the size of the chunks.
-
-    Yields:
-        chunks of size `size`.
-    """
-    for i in range(0, len(seq), size):
-        yield seq[i:i + size]
+    for i in range(num_batches):
+        # grab a set of indices
+        batch_indices = indices[i*batch_size:(i+1)*batch_size]
+        if transpose:
+            yield tuple((item[batch_indices, ...].T for item in data_items))
+        else:
+            yield tuple((item[batch_indices, ...] for item in data_items))
 
 
 def _integer_placeholders(batch_size, sequence_length):
@@ -93,14 +86,13 @@ def get_data(batch_size, sequence_length, dataset, embedding_size):
             matters).
         dataset (str): the dataset. Options at this stage are:
             - _warandpeace_: character-level war and peace.
-<<<<<<< HEAD
             - _occult_: a set of occult texts.
-=======
->>>>>>> 272fb78fa85aadeea702e78b7e5f090d782a4dd6
             - _ptb/char_: character level penn treebank
             - _ptb/word_: word level penn treeback
             - _mnist_: sequential mnist (not sigmoid)
             - _jsb_: JSB chorales
+            - _txt:path/to/textfile_: arbitrary text file with sequences
+                separated by lines.
         embedding_size: if the data needs embedding, how big should they be?
 
     Returns:
@@ -119,6 +111,7 @@ def get_data(batch_size, sequence_length, dataset, embedding_size):
             - `target_size`: probably len(vocab), but maybe not.
     """
     data_dict = {}
+    lengths = None
     if dataset == 'warandpeace':
         import rnndatasets.warandpeace as data
         vocab = data.get_vocab('char')
@@ -175,16 +168,35 @@ def get_data(batch_size, sequence_length, dataset, embedding_size):
         raise NotImplementedError('not even sure this one is a good idea')
     elif dataset == 'jsb':
         raise NotImplementedError('nerp')
-    elif dataset == 'txt':
+    elif 'txt' in dataset:
         # arbitrary line separated text file
-
+        fpath = dataset.split(':')[-1]
+        data, lengths_data, vocab = text_file.get_text_file_data(
+            fpath, sequence_length)
+        inputs, targets = _integer_placeholders(batch_size, sequence_length)
+        lengths = tf.placeholder(tf.int32, shape=[batch_size], name='lengths')
+        rnn_inputs, embedding = embed(
+            inputs, embedding_size, len(vocab))
+        # TODO valid, test
+        valid_fetcher = None
+        test_fetcher = None
+        input_data = data[:, :-1]
+        target_data = data[:, 1:]
+        # get a callable which yields training batches
+        train_fetcher = partial(_batch_iterator,
+                                (input_data, target_data, lengths_data),
+                                batch_size, shuffle=True)
+        go_symbol = vocab['<GO>']
+        data_dict['target_size'] = len(vocab)
+        data_dict['embedding_matrix'] = embedding
     else:
         raise ValueError('Unknown dataset: {}'.format(dataset))
 
     data_dict.update({
         'placeholders': {
             'inputs': inputs,
-            'targets': targets},
+            'targets': targets,
+            'lengths': lengths},
         'rnn_inputs': rnn_inputs,
         'train_iter': train_fetcher,
         'valid_iter': valid_fetcher,

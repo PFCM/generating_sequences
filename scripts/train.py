@@ -47,13 +47,15 @@ def get_forward(data_dict):
     inputs = data_dict['rnn_inputs']
     embedding = data_dict['embedding_matrix']
     vocab_size = data_dict['target_size']
+    lengths = data_dict['placeholders']['lengths']
     model = {}
     with tf.variable_scope('rnn') as scope:
         if 'nextstep' in FLAGS.model:
             if 'standard' in FLAGS.model:
                 forward = rnn.standard_nextstep_inference(
-                    cell, inputs, vocab_size, scope=scope)
+                    cell, inputs, vocab_size, scope=scope, lengths=lengths)
                 scope.reuse_variables()
+                # note no lengths for this one
                 sampling = rnn.standard_nextstep_sample(
                     cell, inputs, vocab_size, embedding, scope=scope)
         else:
@@ -74,7 +76,8 @@ def get_optimiser():
     return tf.train.RMSPropOptimizer(FLAGS.learning_rate)
 
 
-def minimise_xent(rnn_output, targets, global_step=None, var_list=None):
+def minimise_xent(rnn_output, targets, global_step=None, var_list=None,
+                  lengths=None):
     """Gets training ops to minimise the cross entropy between two sequences,
     one of which is float logits (expecting to be softmaxed) and the other
     integer class labels.
@@ -89,20 +92,29 @@ def minimise_xent(rnn_output, targets, global_step=None, var_list=None):
             training.
         var_list (Optional): list of variables to use for training. Defaults to
             tf.trainable_variables().
+        lengths (Optional): batch size integer tensor, indicates the actual
+            length of the input sequences before padding, and therefore where
+            we should start zeroing out the loss.
 
     Returns:
         loss_op, train_op: an op representing the average cross entropy
             per symbol and an op to run a step of training.
     """
-    # we aren't going to do anything fancy here like use weights (yet) so
-    # we may as well just stick them all together into one large batch.
-    logits = tf.concat(0, rnn_output)
+    # if we have lengths, we need to make some weights for the loss
+    batch_size = rnn_output[0].get_shape()[0].value
+    batch_ones = tf.ones([batch_size])
+    if lengths is not None:
+        batch_zeros = tf.zeros([batch_size])
+        weights = [tf.select(lengths < i, batch_ones, batch_zeros)
+                   for i in range(len(rnn_output))]
+    else:
+        weights = [batch_ones for _ in rnn_output]
+    # unpack the targets
+    targets = tf.unstack(targets)
+    loss_op = tf.nn.seq2seq.sequence_loss(rnn_output, targets, weights)
 
-    loss_op = tf.nn.sparse_softmax_cross_entropy_with_logits(
-        logits, tf.reshape(targets, [-1]))
-    loss_op = tf.reduce_mean(loss_op)
     # may as well summarise
-    tf.scalar_summary('xent', loss_op)
+    tf.summary.scalar('xent', loss_op)
 
     # now get some stuff to actually train
     opt = get_optimiser()
@@ -122,12 +134,21 @@ def _end_msg(msg, width=50):
     print('\r{:~^{}}'.format(msg, width))
 
 
-def _fill_feed(data_dict, in_batch, target_batch=None, state_var=None,
+def _fill_feed(data_dict, data_batch, state_var=None,
                state_val=None):
     """fills a feed dict"""
+    target_batch, len_batch = None, None
+    if len(data_batch) == 3:
+        in_batch, target_batch, len_batch = data_batch
+    elif len(data_batch) == 2:
+        in_batch, target_batch = data_batch
+    else:
+        in_batch, = data_batch
     feed = {data_dict['placeholders']['inputs']: in_batch}
     if target_batch is not None:
         feed[data_dict['placeholders']['targets']] = target_batch
+    if len_batch is not None:
+        feed[data_dict['placeholders']['lengths']] = len_batch
     if state_var is not None:
         for var, val in zip(state_var, state_val):
             feed[var] = val
@@ -179,7 +200,7 @@ def sample(model, data, sess, seed=None):
     while len(seq) < FLAGS.sample_length:
         results = sess.run(
             model['sampling']['sequence'] + model['sampling']['final_state'],
-            _fill_feed(data, inputs,
+            _fill_feed(data, [inputs],
                        state_var=model['sampling']['initial_state'],
                        state_val=state))
         seq.extend(results[:FLAGS.sequence_length - 2])
@@ -208,9 +229,9 @@ def do_training(data, model, loss_op, train_op, saver=None):
             state = sess.run(model['inference']['initial_state'])
             print('~~Epoch {}:'.format(epoch + 1))
             epoch_loss, epoch_steps = 0, 0
-            for in_batch, targ_batch in data['train_iter']():
+            for data_batch in data['train_iter']():
                 feed_dict = _fill_feed(
-                    data, in_batch, targ_batch,
+                    data, data_batch,
                     state_var=model['inference']['initial_state'],
                     state_val=state)
                 results = sess.run(
@@ -251,7 +272,7 @@ def main(_):
                            max_to_keep=1)
     loss_op, train_op = minimise_xent(
         rnn_model['inference']['logits'], data['placeholders']['targets'],
-        global_step=global_step)
+        global_step=global_step, lengths=data['placeholders']['lengths'])
     _end_msg('got train ops')
     do_training(data, rnn_model, loss_op, train_op, saver=saver)
 

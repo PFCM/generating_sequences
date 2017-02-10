@@ -18,8 +18,8 @@ import tensorflow as tf
 from models.rnn.helpers import argmax_and_embed, sample_and_embed
 
 
-def standard_nextstep_inference(cell, inputs, output_size, scope=None,
-                                return_states=False):
+def standard_nextstep_inference(cell, inputs, output_size, lengths=None,
+                                scope=None, return_states=False):
     """Gets the forward pass of a standard model for next step prediction.
 
     Args:
@@ -29,6 +29,9 @@ def standard_nextstep_inference(cell, inputs, output_size, scope=None,
             If the inputs are discrete, we expect this to already be embedded.
         output_size (int): the size we project the output to (ie. the number of
             symbols in the vocabulary).
+        lengths: [batch_size] integer tensor containing the actual lengths
+            before padding of the input sequences. If none, we assume no
+            padding ever.
         scope (Optional): variable scope, defaults to "rnn".
         return_states (Optional[bool]): whether or not to return the states
             as well as the projected logits.
@@ -50,7 +53,7 @@ def standard_nextstep_inference(cell, inputs, output_size, scope=None,
 
         states, final_state = tf.nn.rnn(
             cell, inputs, initial_state=initial_state, dtype=tf.float32,
-            scope=scope)
+            scope=scope, sequence_length=lengths)
 
         # we want to project them all at once, because it's faster
         logits = tf.concat(0, states)
